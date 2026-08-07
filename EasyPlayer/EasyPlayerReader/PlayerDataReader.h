@@ -30,6 +30,9 @@
 // 获得解码后的音频帧／视频帧
 @property (nonatomic, copy) void (^frameOutputBlock)(KxMovieFrame *frame, unsigned int length);
 
+/// RTSP SDK 事件回调，eventCode 见 EasyRTSPEventCode.h；data/count/total 对应 Android ResultReceiver 附加参数
+@property (nonatomic, copy) void (^rtspEventBlock)(NSInteger eventCode, NSString *message, NSInteger data, NSInteger count, NSInteger total);
+
 + (void)startUp;
 
 - (id)initWithUrl:(NSString *)url;

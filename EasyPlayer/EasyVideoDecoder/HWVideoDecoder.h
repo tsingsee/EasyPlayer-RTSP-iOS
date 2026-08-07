@@ -37,4 +37,7 @@ typedef enum {
 -(void) getDecodePictureData:(KxVideoFrame *) frame length:(unsigned int) length;
 -(void) getDecodePixelData:(CVImageBufferRef) frame;
 
+@optional
+- (void)hwVideoDecoder:(HWVideoDecoder *)decoder didFailWithMessage:(NSString *)message;
+
 @end

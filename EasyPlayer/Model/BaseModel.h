@@ -8,7 +8,10 @@
 
 #import <Foundation/Foundation.h>
 
-#if __has_include(<YYModel/YYModel.h>)
+#if __has_include(<YYKit/YYKit.h>)
+    #import <YYKit/NSObject+YYModel.h>
+    #import <YYKit/YYClassInfo.h>
+#elif __has_include(<YYModel/YYModel.h>)
     FOUNDATION_EXPORT double YYModelVersionNumber;
     FOUNDATION_EXPORT const unsigned char YYModelVersionString[];
     #import <YYModel/NSObject+YYModel.h>

@@ -4,6 +4,8 @@
 #import "UIColor+HexColor.h"
 #import "VideoPanel.h"
 #import "AudioManager.h"
+#import "EasyRTSPEventCode.h"
+#import "PlayerResultCode.h"
 
 @interface VideoPlayerController () <VideoPanelDelegate>
 
@@ -12,6 +14,7 @@
 
 @property (nonatomic, assign) BOOL statusBarHidden;
 @property (nonatomic, assign) CGRect panelFrame;
+@property (nonatomic, assign) BOOL didLogFirstFrameCost;
 
 @end
 
@@ -35,6 +38,10 @@
     [[AudioManager sharedInstance] activateAudioSession];
     
     self.panelFrame = CGRectMake(0, 0, EasyScreenWidth, EasyScreenWidth);
+    
+    [self createStatusView];
+    [self addStatus:@"页面就绪"];
+    
     self.panel = [[VideoPanel alloc] initWithFrame:self.panelFrame];
     self.panel.delegate = self;
     [self.view addSubview:self.panel];
@@ -49,6 +56,66 @@
     
     UIBarButtonItem *btn = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"flie"] style:UIBarButtonItemStyleDone target:self action:@selector(fileList)];
     self.navigationItem.rightBarButtonItem = btn;
+}
+
+- (void)createStatusView{
+
+    CGFloat y =
+    CGRectGetMaxY(self.panelFrame) + 10;
+
+
+    self.statusView =[[UITextView alloc] initWithFrame:
+     CGRectMake(10, y, EasyScreenWidth - 20, 200)];
+
+
+    self.statusView.backgroundColor = [UIColor colorWithWhite:0.1 alpha:1];
+
+
+    self.statusView.textColor = UIColor.greenColor;
+
+
+    self.statusView.font = [UIFont systemFontOfSize:14];
+
+
+    self.statusView.editable = NO;
+
+
+    [self.view addSubview:self.statusView];
+
+}
+
+- (void)addStatusCode:(NSInteger)code msg:(NSString *)msg
+{
+    [self addStatus:[NSString stringWithFormat:@"code:%ld mag:%@", (long)code, msg ?: @""]];
+}
+
+- (void)addStatus:(NSString *)msg
+{
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+
+    formatter.dateFormat = @"yyyy-MM-dd HH:mm:ss.SSS";
+
+    NSString *time =
+    [formatter stringFromDate:[NSDate date]];
+
+
+    NSString *line =
+    [NSString stringWithFormat:@"%@ %@", time, msg];
+
+
+    NSString *old = self.statusView.text ?: @"";
+    if (old.length == 0) {
+        self.statusView.text = line;
+    } else {
+        self.statusView.text = [old stringByAppendingFormat:@"\n%@", line];
+    }
+
+
+    // 自动滚动到底部
+    NSRange range =
+    NSMakeRange(self.statusView.text.length, 0);
+
+    [self.statusView scrollRangeToVisible:range];
 }
 
 - (void) viewWillAppear:(BOOL)animated {
@@ -156,7 +223,76 @@
 }
 
 - (void)activeVideoViewRendStatusChanged:(VideoView *)view {
-    
+    // 状态日志由 RTSP 事件回调驱动，见 activeVideoView:didReceiveRTSPEvent:message:
+}
+
+- (void)activeVideoView:(VideoView *)view didReceiveRTSPEvent:(NSInteger)eventCode message:(NSString *)message data:(NSInteger)data count:(NSInteger)count total:(NSInteger)total {
+    switch (eventCode) {
+        case EVENT_CODEC_CONNECTING:
+            self.didLogFirstFrameCost = NO;
+            [self addStatusCode:PLAYER_RESULT_CONNECTING msg:@"连接中"];
+            break;
+        case EVENT_CODEC_CONNECTED:
+            [self addStatusCode:PLAYER_RESULT_CONNECTED msg:@"连接成功"];
+            break;
+        case EVENT_CODEC_CONNECT_FAIL:
+            [self addStatusCode:PLAYER_RESULT_CONNECT_FAIL msg:message.length ? message : @"连接失败"];
+            break;
+        case EVENT_CODEC_CHANGE_RESOLUTION:
+            [self addStatusCode:PLAYER_RESULT_CHANGE_RESOLUTION msg:message.length ? message : @"切换分辨率"];
+            break;
+        case EVENT_CODEC_STREAM_ABORT:
+            [self addStatusCode:PLAYER_RESULT_STREAM_ABORT msg:message.length ? message : @"流中断"];
+            break;
+        case EVENT_CODEC_RECONN:
+            self.didLogFirstFrameCost = NO;
+            [self addStatusCode:PLAYER_RESULT_RECONN msg:message.length ? message : @"重连中"];
+            break;
+        case EVENT_CODEC_NO_DATA:
+            [self addStatusCode:PLAYER_RESULT_NO_DATA msg:message.length ? message : @"无数据"];
+            break;
+        case EVENT_CODEC_CONNECT_TIMEOUT:
+            [self addStatusCode:PLAYER_RESULT_TIMEOUT msg:message.length ? message : @"超时"];
+            break;
+        case EVENT_CODEC_EXIT:
+            self.didLogFirstFrameCost = NO;
+            [self addStatusCode:PLAYER_RESULT_EXIT msg:message.length ? message : @"连接退出"];
+            break;
+        case EVENT_CODEC_FIRST_FRAME:
+            if (!self.didLogFirstFrameCost) {
+                self.didLogFirstFrameCost = YES;
+                NSInteger ms = data > 0 ? data : (NSInteger)view.firstFrameCostMs;
+                [self addStatusCode:PLAYER_RESULT_FIRST_FRAME_TIME
+                                msg:[NSString stringWithFormat:@"首帧:%ldms", (long)ms]];
+            }
+            break;
+        case EVENT_CODEC_ERROR:
+            [self addStatusCode:PLAYER_RESULT_DECODE_FAIL msg:message.length ? message : @"解码失败"];
+            break;
+        case EVENT_CODEC_FILE_INFO:
+            [self addStatusCode:PLAYER_RESULT_VIDEO_RESOLUTION msg:message.length ? message : @"视频分辨率"];
+            break;
+        default:
+            if (eventCode == PLAYER_RESULT_DECODE_MODE) {
+                [self addStatusCode:PLAYER_RESULT_DECODE_MODE msg:message.length ? message : @"解码方式"];
+            } else if (eventCode == PLAYER_RESULT_VIDEO_CODEC) {
+                [self addStatusCode:PLAYER_RESULT_VIDEO_CODEC msg:message.length ? message : @"视频编码"];
+            } else if (eventCode == PLAYER_RESULT_RECONN_COST) {
+                [self addStatusCode:PLAYER_RESULT_RECONN_COST
+                                msg:[NSString stringWithFormat:@"%ldms 第%ld次", (long)data, (long)count]];
+            } else if (eventCode == PLAYER_RESULT_VIDEO_CODEC_UNSUPPORTED) {
+                [self addStatusCode:PLAYER_RESULT_VIDEO_CODEC_UNSUPPORTED msg:message.length ? message : @"不支持该视频编码"];
+            } else if (eventCode == PLAYER_RESULT_AUDIO_CODEC_UNSUPPORTED) {
+                [self addStatusCode:PLAYER_RESULT_AUDIO_CODEC_UNSUPPORTED msg:message.length ? message : @"不支持该音频格式"];
+            } else if (eventCode == PLAYER_RESULT_PLAY_SUCCESS_RATE) {
+                NSString *msg = message.length
+                    ? message
+                    : [NSString stringWithFormat:@"{success:%ld%%,s_count:%ld,total:%ld}",
+                       (long)data, (long)count, (long)total];
+                [self addStatusCode:PLAYER_RESULT_PLAY_SUCCESS_RATE msg:msg];
+            }
+            break;
+    }
 }
 
 - (void)videoViewWillAddNewRes:(VideoView *)view index:(int)index {

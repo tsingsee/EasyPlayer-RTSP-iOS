@@ -22,6 +22,19 @@
 
 @implementation HWVideoDecoder
 
+- (void)reportDecodeFailure:(NSString *)reason status:(OSStatus)status {
+    if (![self.hwDelegate respondsToSelector:@selector(hwVideoDecoder:didFailWithMessage:)]) {
+        return;
+    }
+    NSString *msg = (status == noErr || status == 0)
+        ? reason
+        : [NSString stringWithFormat:@"%@(%d)", reason, (int)status];
+    id<HWVideoDecoderDelegate> delegate = self.hwDelegate;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [delegate hwVideoDecoder:self didFailWithMessage:msg];
+    });
+}
+
 #pragma mark - VideoToolBox Decompress Frame CallBack
 
 // 2、回调函数可以完成CGBitmap图像转换成UIImage图像的处理，将图像通过队列发送到Control来进行显示处理
@@ -32,17 +45,21 @@ void didDecompress(void *decompressionOutputRefCon,
                    CVImageBufferRef imageBuffer,
                    CMTime presentationTimeStamp,
                    CMTime presentationDuration) {
+    HWVideoDecoder *decoder = (__bridge HWVideoDecoder *)decompressionOutputRefCon;
     if (status != noErr || !imageBuffer) {
         NSLog(@"Error decompresssing frame at time: %.3f error: %d infoFlags: %u",
               (float)presentationTimeStamp.value / presentationTimeStamp.timescale,
               (int)status,
               (unsigned int)infoFlags);
+        if (decoder) {
+            [decoder reportDecodeFailure:@"硬件解码帧失败" status:status];
+        }
         return;
     }
     
     if (status == noErr) {
         if (imageBuffer != NULL) {
-            __weak __block HWVideoDecoder *weakSelf = (__bridge HWVideoDecoder *)decompressionOutputRefCon;
+            __weak __block HWVideoDecoder *weakSelf = decoder;
 #if 1
 //            yuv(imageBuffer, weakSelf);
             rgb(imageBuffer, weakSelf);
@@ -80,11 +97,14 @@ void yuv(CVImageBufferRef imageBuffer, HWVideoDecoder *weakSelf) {
             frame.height = h;
             frame.duration = 0.04;
             
-            frame.luma = [NSData dataWithBytes:srcy length:w * h];
-            frame.chromaB = [NSData dataWithBytes:srcy length:w * h / 4];
-            frame.chromaR = [NSData dataWithBytes:srcy length:w * h / 4];
+            frame.lumaData = srcy;
+            frame.lumaLinesize = (int)linesizey;
+            frame.chromaBData = srcuv;
+            frame.chromaBLinesize = (int)linesizeuv;
+            frame.chromaRData = srcuv;
+            frame.chromaRLinesize = (int)linesizeuv;
             
-            [weakSelf.hwDelegate getDecodePictureData:frame length:(unsigned int)(frame.luma.length + frame.chromaB.length + frame.chromaR.length)];
+            [weakSelf.hwDelegate getDecodePictureData:frame length:(unsigned int)(w * h * 3 / 2)];
         }
     }
     
@@ -147,6 +167,7 @@ void rgb(CVImageBufferRef imageBuffer, HWVideoDecoder *weakSelf) {
         getXps(pData, 0, len, 8, &ppsIndex, &ppsLength);// 8代表pps
         
         if (spsLength == 0 || ppsLength == 0) {
+            [self reportDecodeFailure:@"硬件解码SPS/PPS解析失败" status:noErr];
             return;
         }
         
@@ -180,6 +201,7 @@ void rgb(CVImageBufferRef imageBuffer, HWVideoDecoder *weakSelf) {
                                                                               4,
                                                                               &videoFormatDescr);
         if (status != noErr) {
+            [self reportDecodeFailure:@"硬件解码FormatDescription创建失败" status:status];
             return;
         }
         
@@ -199,20 +221,22 @@ void rgb(CVImageBufferRef imageBuffer, HWVideoDecoder *weakSelf) {
                                               (__bridge CFDictionaryRef)attributes,
                                               &callback,
                                               &decompressSession);
-        
-//        VTSessionSetProperty(decompressSession,
-//                             kVTDecompressionPropertyKey_ThreadCount,
-//                             (__bridge CFTypeRef)[NSNumber numberWithInt:1]);
-//
-//        // 设置实时解码输出（避免延迟）
-//        VTSessionSetProperty(decompressSession,
-//                             kVTDecompressionPropertyKey_RealTime,
-//                             kCFBooleanTrue);
-//
-//        // h264 profile, 直播一般使用baseline，可减少由于b帧带来的延时
-//        VTSessionSetProperty(decompressSession,
-//                             kVTCompressionPropertyKey_ProfileLevel,
-//                             kVTProfileLevel_H264_Baseline_AutoLevel);
+        if (status != noErr) {
+            [self reportDecodeFailure:@"硬件解码Session创建失败" status:status];
+            return;
+        }
+
+        VTSessionSetProperty(decompressSession,
+                             kVTDecompressionPropertyKey_ThreadCount,
+                             (__bridge CFTypeRef)[NSNumber numberWithInt:1]);
+
+        VTSessionSetProperty(decompressSession,
+                             kVTDecompressionPropertyKey_RealTime,
+                             kCFBooleanTrue);
+
+        VTSessionSetProperty(decompressSession,
+                             kVTCompressionPropertyKey_ProfileLevel,
+                             kVTProfileLevel_H264_Baseline_AutoLevel);
     }
 }
 
@@ -308,6 +332,12 @@ void getXps(unsigned char *data, int offset, int length, int type, int *outPos, 
     }
     
     if (nDiff == 0) {
+        [self reportDecodeFailure:@"硬件解码NAL解析失败" status:noErr];
+        return -1;
+    }
+
+    if (decompressSession == NULL || videoFormatDescr == NULL) {
+        [self reportDecodeFailure:@"硬件解码器未初始化" status:noErr];
         return -1;
     }
     
@@ -379,6 +409,12 @@ void getXps(unsigned char *data, int offset, int length, int type, int *outPos, 
                                                    flags,
                                                    &sbRef,
                                                    &flagOut);
+        if (status != noErr) {
+            [self reportDecodeFailure:@"硬件解码DecodeFrame失败" status:status];
+            CFRelease(sbRef);
+            sbRef = NULL;
+            return -1;
+        }
         if (status == noErr) {
             // Block until our callback has been called with the last frame
            status = VTDecompressionSessionWaitForAsynchronousFrames(decompressSession);

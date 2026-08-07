@@ -409,10 +409,13 @@
                             <constraint firstItem="PwD-aR-knl" firstAttribute="leading" secondItem="RNV-tV-AGh" secondAttribute="leading" id="lfm-Ty-2ev"/>
                             <constraint firstAttribute="trailing" secondItem="rYi-GU-OY8" secondAttribute="trailing" id="qcI-M6-Mym"/>
                             <constraint firstItem="u6U-fr-ZWg" firstAttribute="centerX" secondItem="1N3-V0-k9A" secondAttribute="centerX" id="tey-0b-mCM"/>
+                            <constraint firstItem="RNV-tV-AGh" firstAttribute="width" constant="260" id="scan-frame-w-con"/>
+                            <constraint firstItem="RNV-tV-AGh" firstAttribute="height" constant="260" id="scan-frame-h-con"/>
                         </constraints>
                     </view>
                     <connections>
                         <outlet property="contentView" destination="PwD-aR-knl" id="Y6Q-8x-mx2"/>
+                        <outlet property="scanFrameView" destination="RNV-tV-AGh" id="scan-frame-view-outlet"/>
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="sJz-Vs-0CC" userLabel="First Responder" sceneMemberID="firstResponder"/>

@@ -190,7 +190,7 @@ unsigned int DecodeVideo(void *DecHandle, DEC_DECODE_PARAM *pDecodeParam, DVDVid
         pDecodeParam->nOutHeight = pComponent->pFrame->height;
         
         // 只有在解出一帧的时候pCodecCtx的宽度和高度才是实际的值
-        if (s_uiDecodeMethod == IDM_SW) {
+        if (s_uiDecodeMethod == IDM_SW && !pDecodeParam->skip_rgb_convert) {
             if (!pComponent->bScaleCreated) {
                 setupScaler(pComponent, picture->iDisplayWidth, picture->iDisplayHeight);
                 pComponent->bScaleCreated = !pComponent->bScaleCreated;

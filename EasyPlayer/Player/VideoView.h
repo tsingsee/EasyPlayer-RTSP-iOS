@@ -1,13 +1,7 @@
 
 #import <UIKit/UIKit.h>
 #import "PlayerDataReader.h"
-
-typedef enum {
-    Stopped,    // 停止
-    Suspend,    // 暂停
-    Connecting, // 连接中
-    Rendering,  // 播放中
-}IVideoStatus;
+#import "IVideoStatus.h"
 
 @protocol VideoViewDelegate;
 
@@ -31,6 +25,8 @@ typedef enum {
 
 @property (nonatomic, strong) PlayerDataReader *reader;
 @property (nonatomic, assign) IVideoStatus videoStatus;
+@property (nonatomic, assign, readonly) BOOL hasReceivedFirstFrame;
+@property (nonatomic, assign, readonly) NSTimeInterval firstFrameCostMs;
 
 @property (nonatomic, assign) BOOL active;
 @property (nonatomic, assign) BOOL useHWDecoder;        // 是否启用硬解
@@ -66,6 +62,12 @@ typedef enum {
 
 // 连接视频源
 - (void)videoViewWillTryToConnect:(VideoView *)view;
+
+// 播放状态变化
+- (void)videoView:(VideoView *)view didChangeStatus:(IVideoStatus)status;
+
+// RTSP SDK 事件
+- (void)videoView:(VideoView *)view didReceiveRTSPEvent:(NSInteger)eventCode message:(NSString *)message data:(NSInteger)data count:(NSInteger)count total:(NSInteger)total;
 
 - (void) back;
 

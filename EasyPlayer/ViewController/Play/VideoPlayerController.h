@@ -9,4 +9,8 @@
 
 @property (nonatomic, strong) URLModel *model;
 
+@property(nonatomic,strong) UITextView *statusView;
+
 @end
+
+

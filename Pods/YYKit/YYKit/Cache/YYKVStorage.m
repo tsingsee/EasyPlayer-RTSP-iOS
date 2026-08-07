@@ -89,8 +89,23 @@ static NSString *const kTrashDirectoryName = @"trash";
         return YES;
     } else {
         _db = NULL;
-        if (_dbStmtCache) CFRelease(_dbStmtCache);
-        _dbStmtCache = NULL;
+        if (_dbStmtCache) {
+    CFIndex size = CFDictionaryGetCount(_dbStmtCache);
+    if (size > 0) {
+        const void **values = (const void **)malloc(sizeof(void *) * size);
+        if (values) {
+            CFDictionaryGetKeysAndValues(_dbStmtCache, NULL, values);
+            for (CFIndex i = 0; i < size; i++) {
+                sqlite3_stmt *stmt = (sqlite3_stmt *)values[i];
+                if (stmt) sqlite3_finalize(stmt);
+            }
+            free(values);
+        }
+    }
+    CFRelease(_dbStmtCache);
+}
+_dbStmtCache = NULL;
+
         _dbLastOpenErrorTime = CACurrentMediaTime();
         _dbOpenErrorCount++;
         

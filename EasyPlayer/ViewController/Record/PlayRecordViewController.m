@@ -25,7 +25,16 @@
 - (void) viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
     
-    self.navigationItem.title = [self.path substringFromIndex:self.path.length-18];
+    if (self.path.length > 0) {
+        NSUInteger suffixLength = 18;
+        if (self.path.length <= suffixLength) {
+            self.navigationItem.title = self.path.lastPathComponent.length > 0 ? self.path.lastPathComponent : self.path;
+        } else {
+            self.navigationItem.title = [self.path substringFromIndex:self.path.length - suffixLength];
+        }
+    } else {
+        self.navigationItem.title = @"录像回放";
+    }
     
     NSURL *url = [NSURL fileURLWithPath:self.path];
     AVPlayer *avPlayer = [AVPlayer playerWithURL:url];

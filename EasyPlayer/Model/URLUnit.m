@@ -14,11 +14,20 @@ static NSString *URLUnitKey = @"URLUnitKey";
 
 @implementation URLUnit
 
++ (YYCache *)sharedCache {
+    static YYCache *cache = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        cache = [YYCache cacheWithName:URLUnitName];
+    });
+    return cache;
+}
+
 #pragma mark - 播放url的存储
 
 // 获取所有url
 + (NSMutableArray *) urlModels {
-    YYCache *cache = [YYCache cacheWithName:URLUnitName];
+    YYCache *cache = [self sharedCache];
     NSMutableArray *arr = (NSMutableArray *)[cache objectForKey:URLUnitKey];
     
     return arr;
@@ -46,7 +55,7 @@ static NSString *URLUnitKey = @"URLUnitKey";
         [arr insertObject:model atIndex:0];
     }
     
-    YYCache *cache = [YYCache cacheWithName:URLUnitName];
+    YYCache *cache = [self sharedCache];
     [cache setObject:arr forKey:URLUnitKey];
 }
 
@@ -65,7 +74,7 @@ static NSString *URLUnitKey = @"URLUnitKey";
         }
     }
     
-    YYCache *cache = [YYCache cacheWithName:URLUnitName];
+    YYCache *cache = [self sharedCache];
     [cache setObject:arr forKey:URLUnitKey];
 }
 
@@ -76,7 +85,7 @@ static NSString *URLUnitKey = @"URLUnitKey";
     
     [arr removeObject:model];
     
-    YYCache *cache = [YYCache cacheWithName:URLUnitName];
+    YYCache *cache = [self sharedCache];
     [cache setObject:arr forKey:URLUnitKey];
 }
 

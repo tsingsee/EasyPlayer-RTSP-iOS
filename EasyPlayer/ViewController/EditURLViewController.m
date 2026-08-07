@@ -74,7 +74,7 @@
     if (self.model.url) {
         self.textField.text = self.model.url;
     } else {
-        self.textField.text = @"rtsp://";
+        self.textField.text = @"rtsp://admin:a1234567@192.168.2.120:554/Streaming/Channels/101";
     }
     
     if (self.model.transportMode == EASY_RTP_OVER_TCP) {

@@ -20,6 +20,10 @@ EasyPlayer-**RTSP iOS** 播放器是由EasyDarwin开源团队开发和维护的�
 ## 编译方法
 Xcode 编译；
 
+详细开发说明见 **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**（环境搭建、架构、核心 API、二次开发）。
+
+集成到自有工程见 **[docs/INTEGRATION.md](docs/INTEGRATION.md)**（静态库/头文件、依赖、Info.plist、播放示例）。
+
 
 ## 技术支持
 

@@ -265,12 +265,15 @@
 		6696779922753F5B00E92A8A /* KxMovieDecoder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = KxMovieDecoder.m; sourceTree = "<group>"; };
 		6696779B22753F5B00E92A8A /* PlayerDataReader.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = PlayerDataReader.mm; sourceTree = "<group>"; };
 		6696779C22753F5B00E92A8A /* PlayerDataReader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PlayerDataReader.h; sourceTree = "<group>"; };
+		E92A8B0222753F5B00E92A8A /* EasyRTSPEventCode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = EasyRTSPEventCode.h; sourceTree = "<group>"; };
 		6696779D22753F5B00E92A8A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6696779F22753F5B00E92A8A /* AudioManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AudioManager.h; sourceTree = "<group>"; };
 		669677A022753F5B00E92A8A /* UIColor+HexColor.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "UIColor+HexColor.m"; sourceTree = "<group>"; };
 		669677A122753F5B00E92A8A /* VideoView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = VideoView.m; sourceTree = "<group>"; };
 		669677A222753F5B00E92A8A /* AudioManager.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = AudioManager.mm; sourceTree = "<group>"; };
 		669677A322753F5B00E92A8A /* VideoView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = VideoView.h; sourceTree = "<group>"; };
+		E92A8B0122753F5B00E92A8A /* IVideoStatus.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = IVideoStatus.h; sourceTree = "<group>"; };
+		E92A8B0322753F5B00E92A8A /* PlayerResultCode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PlayerResultCode.h; sourceTree = "<group>"; };
 		669677A422753F5B00E92A8A /* UIColor+HexColor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "UIColor+HexColor.h"; sourceTree = "<group>"; };
 		669677A622753F5B00E92A8A /* HWVideoDecoder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = HWVideoDecoder.m; sourceTree = "<group>"; };
 		669677A722753F5B00E92A8A /* VideoDecode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = VideoDecode.h; sourceTree = "<group>"; };
@@ -627,6 +630,7 @@
 			children = (
 				6696777822753F5A00E92A8A /* EasyTypes.h */,
 				6696777922753F5A00E92A8A /* EasyRTSPClientAPI.h */,
+				E92A8B0222753F5B00E92A8A /* EasyRTSPEventCode.h */,
 			);
 			path = include;
 			sourceTree = "<group>";
@@ -696,6 +700,8 @@
 		6696779E22753F5B00E92A8A /* Player */ = {
 			isa = PBXGroup;
 			children = (
+				E92A8B0322753F5B00E92A8A /* PlayerResultCode.h */,
+				E92A8B0122753F5B00E92A8A /* IVideoStatus.h */,
 				669677A322753F5B00E92A8A /* VideoView.h */,
 				669677A122753F5B00E92A8A /* VideoView.m */,
 				6696779F22753F5B00E92A8A /* AudioManager.h */,
@@ -890,7 +896,7 @@
 			files = (
 			);
 			inputPaths = (
-				"${SRCROOT}/Pods/Target Support Files/Pods-EasyPlayerRTSP/Pods-EasyPlayerRTSP-frameworks.sh",
+				"${PODS_ROOT}/Target Support Files/Pods-EasyPlayerRTSP/Pods-EasyPlayerRTSP-frameworks.sh",
 				"${BUILT_PRODUCTS_DIR}/IQKeyboardManager/IQKeyboardManager.framework",
 				"${BUILT_PRODUCTS_DIR}/Masonry/Masonry.framework",
 				"${BUILT_PRODUCTS_DIR}/RTRootNavigationController/RTRootNavigationController.framework",
@@ -909,7 +915,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT}/Pods/Target Support Files/Pods-EasyPlayerRTSP/Pods-EasyPlayerRTSP-frameworks.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-EasyPlayerRTSP/Pods-EasyPlayerRTSP-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -988,7 +994,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -1031,7 +1037,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 10.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
@@ -1044,7 +1050,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -1081,7 +1087,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 10.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				VALIDATE_PRODUCT = YES;
@@ -1093,7 +1099,7 @@
 			baseConfigurationReference = 02E19BEBCD451349B8CB5207 /* Pods-EasyPlayerRTSP.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_WARN_BOOL_CONVERSION = NO;
 				CLANG_WARN_CONSTANT_CONVERSION = NO;
@@ -1102,6 +1108,7 @@
 				CLANG_WARN_SUSPICIOUS_MOVE = NO;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 26052802;
 				DEVELOPMENT_TEAM = 33USAS7KQX;
 				ENABLE_BITCODE = NO;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -1121,9 +1128,12 @@
 					"\"${PODS_ROOT}/Headers/Public/YYKit\"",
 					"$(SDKROOT)/usr/include/libxml2",
 					"$(PROJECT_DIR)/EasyPlayer/ffmpeg/include",
+					"$(PROJECT_DIR)/EasyPlayer/libEasyRTSPClient/include",
 				);
 				INFOPLIST_FILE = "$(SRCROOT)/EasyPlayer/Main/Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				INFOPLIST_KEY_CFBundleDisplayName = EasyPlayerRTSP;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1137,7 +1147,7 @@
 					"$(PROJECT_DIR)/EasyPlayer/ffmpeg/lib",
 					"$(PROJECT_DIR)/EasyPlayer/libEasyRTSPClient",
 				);
-				MARKETING_VERSION = 1.6;
+				MARKETING_VERSION = 1.9.1;
 				ORDER_FILE = "";
 				OTHER_LDFLAGS = (
 					"$(inherited)",
@@ -1196,7 +1206,7 @@
 			baseConfigurationReference = E8EE66CDBAC44889E7D217F6 /* Pods-EasyPlayerRTSP.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_WARN_BOOL_CONVERSION = NO;
 				CLANG_WARN_CONSTANT_CONVERSION = NO;
@@ -1205,6 +1215,7 @@
 				CLANG_WARN_SUSPICIOUS_MOVE = NO;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 26052802;
 				DEVELOPMENT_TEAM = 33USAS7KQX;
 				ENABLE_BITCODE = NO;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
@@ -1223,9 +1234,12 @@
 					"\"${PODS_ROOT}/Headers/Public/YYKit\"",
 					"$(SDKROOT)/usr/include/libxml2",
 					"$(PROJECT_DIR)/EasyPlayer/ffmpeg/include",
+					"$(PROJECT_DIR)/EasyPlayer/libEasyRTSPClient/include",
 				);
 				INFOPLIST_FILE = "$(SRCROOT)/EasyPlayer/Main/Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				INFOPLIST_KEY_CFBundleDisplayName = EasyPlayerRTSP;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1239,7 +1253,7 @@
 					"$(PROJECT_DIR)/EasyPlayer/ffmpeg/lib",
 					"$(PROJECT_DIR)/EasyPlayer/libEasyRTSPClient",
 				);
-				MARKETING_VERSION = 1.6;
+				MARKETING_VERSION = 1.9.1;
 				ORDER_FILE = "";
 				OTHER_CFLAGS = (
 					"$(inherited)",

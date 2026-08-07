@@ -13,8 +13,8 @@
 #import <QuartzCore/QuartzCore.h>
 #import <OpenGLES/EAGLDrawable.h>
 #import <OpenGLES/EAGL.h>
-#import <OpenGLES/ES2/gl.h>
-#import <OpenGLES/ES2/glext.h>
+#import <OpenGLES/ES3/gl.h>
+#import <OpenGLES/ES3/glext.h>
 #import "KxMovieDecoder.h"
 
 //////////////////////////////////////////////////////////
@@ -100,7 +100,8 @@ static BOOL validateProgram(GLuint prog)
 static GLuint compileShader(GLenum type, NSString *shaderString)
 {
 	GLint status;
-	const GLchar *sources = (GLchar *)shaderString.UTF8String;
+    NSString *versioned = [@"#version 100\n" stringByAppendingString:shaderString];
+	const GLchar *sources = (GLchar *)versioned.UTF8String;
 	
     GLuint shader = glCreateShader(type);
     if (shader == 0 || shader == GL_INVALID_ENUM) {
@@ -297,10 +298,6 @@ static GLuint compileShader(GLenum type, NSString *shaderString)
 - (void) updateFrame: (KxVideoFrame *) frame {
     KxVideoFrameYUV *yuvFrame = (KxVideoFrameYUV *)frame;
     
-    assert(yuvFrame.luma.length == yuvFrame.width * yuvFrame.height);
-    assert(yuvFrame.chromaB.length == (yuvFrame.width * yuvFrame.height) / 4);
-    assert(yuvFrame.chromaR.length == (yuvFrame.width * yuvFrame.height) / 4);
-    
     const NSUInteger frameWidth = frame.width;
     const NSUInteger frameHeight = frame.height;    
     
@@ -309,11 +306,14 @@ static GLuint compileShader(GLenum type, NSString *shaderString)
     if (0 == _textures[0])
         glGenTextures(3, _textures);
     
-    const UInt8 *pixels[3] = { yuvFrame.luma.bytes, yuvFrame.chromaB.bytes, yuvFrame.chromaR.bytes };
+    const UInt8 *pixels[3] = { yuvFrame.lumaData, yuvFrame.chromaBData, yuvFrame.chromaRData };
+    const int strides[3]   = { yuvFrame.lumaLinesize, yuvFrame.chromaBLinesize, yuvFrame.chromaRLinesize };
     const NSUInteger widths[3]  = { frameWidth, frameWidth / 2, frameWidth / 2 };
     const NSUInteger heights[3] = { frameHeight, frameHeight / 2, frameHeight / 2 };
     
     for (int i = 0; i < 3; ++i) {
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, strides[i]);
+        
         glBindTexture(GL_TEXTURE_2D, _textures[i]);
         glTexImage2D(GL_TEXTURE_2D,
                      0,
@@ -328,7 +328,9 @@ static GLuint compileShader(GLenum type, NSString *shaderString)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    }     
+    }
+    
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 }
 
 - (BOOL) prepareRender {
@@ -373,24 +375,21 @@ enum {
     CGSize boundsSizeAtFrameBufferEpoch;
     id<KxMovieGLRenderer> _renderer;
     
-    CIContext *_ciContext;
-    CVOpenGLESTextureCacheRef _textureCache;
-    
     KxVideoFrameFormat format;
     NSUInteger srcWidth;
     NSUInteger srcHeight;
+    
+    dispatch_queue_t _glQueue;
 }
 
 + (Class) layerClass {
 	return [CAEAGLLayer class];
 }
 
-static NSDictionary *SCContextCreateCIContextOptions() {
-    return @{kCIContextWorkingColorSpace : [NSNull null], kCIContextOutputColorSpace : [NSNull null]};
-}
-
 - (id) initWithFrame:(CGRect)frame {
     if (self = [super initWithFrame:frame]) {
+        _glQueue = dispatch_queue_create("com.easyplayer.glrender", DISPATCH_QUEUE_SERIAL);
+        
         CAEAGLLayer *eaglLayer = (CAEAGLLayer*) self.layer;
         eaglLayer.opaque = YES;
         eaglLayer.drawableProperties = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -398,10 +397,9 @@ static NSDictionary *SCContextCreateCIContextOptions() {
                                         kEAGLColorFormatRGBA8, kEAGLDrawablePropertyColorFormat,
                                         nil];
         
-        _context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
-        _ciContext = [CIContext contextWithEAGLContext:_context options:SCContextCreateCIContextOptions()];
+        _context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES3];
         self.contentScaleFactor = [UIScreen mainScreen].scale;
-        if (!_context || ![EAGLContext setCurrentContext:_context]) {
+        if (!_context) {
             self = nil;
             return nil;
         }
@@ -410,16 +408,30 @@ static NSDictionary *SCContextCreateCIContextOptions() {
         
         format = KxVideoFrameFormatYUV;
         
-        [self createDisplayFramebuffer];
+        __block BOOL glInitSuccess = YES;
+        CGSize boundsSize = self.bounds.size;
+        dispatch_sync(_glQueue, ^{
+            if (![EAGLContext setCurrentContext:_context]) {
+                glInitSuccess = NO;
+                return;
+            }
+            
+            [self createDisplayFramebufferWithLayer:eaglLayer boundsSize:boundsSize];
+            
+            GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+            if (status != GL_FRAMEBUFFER_COMPLETE) {
+                glInitSuccess = NO;
+                return;
+            }
+            
+            GLenum glError = glGetError();
+            if (GL_NO_ERROR != glError) {
+                glInitSuccess = NO;
+                return;
+            }
+        });
         
-        GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-        if (status != GL_FRAMEBUFFER_COMPLETE) {
-            self = nil;
-            return nil;
-        }
-        
-        GLenum glError = glGetError();
-        if (GL_NO_ERROR != glError) {
+        if (!glInitSuccess) {
             self = nil;
             return nil;
         }
@@ -437,7 +449,7 @@ static NSDictionary *SCContextCreateCIContextOptions() {
     return self;
 }
 
-- (void)createDisplayFramebuffer {
+- (void)createDisplayFramebufferWithLayer:(CAEAGLLayer *)eaglLayer boundsSize:(CGSize)boundsSize {
     [EAGLContext setCurrentContext:_context];
     
     glGenFramebuffers(1, &_framebuffer);
@@ -445,7 +457,7 @@ static NSDictionary *SCContextCreateCIContextOptions() {
     glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, _renderbuffer);
     
-    [_context renderbufferStorage:GL_RENDERBUFFER fromDrawable:(CAEAGLLayer*)self.layer];
+    [_context renderbufferStorage:GL_RENDERBUFFER fromDrawable:eaglLayer];
     
     glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &_backingWidth);
     glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_HEIGHT, &_backingHeight);
@@ -460,7 +472,7 @@ static NSDictionary *SCContextCreateCIContextOptions() {
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         NSLog(@"Failure with display framebuffer generation for display of size: %d %d", _backingWidth, _backingHeight);
     }
-    boundsSizeAtFrameBufferEpoch = self.bounds.size;
+    boundsSizeAtFrameBufferEpoch = boundsSize;
 }
 
 - (void)destroyDisplayFramebuffer; {
@@ -477,102 +489,100 @@ static NSDictionary *SCContextCreateCIContextOptions() {
 }
 
 - (void)dealloc {
-    _renderer = nil;
-    
-    if (_framebuffer) {
-        glDeleteFramebuffers(1, &_framebuffer);
-        _framebuffer = 0;
-    }
-    
-    if (_renderbuffer) {
-        glDeleteRenderbuffers(1, &_renderbuffer);
-        _renderbuffer = 0;
-    }
-    
-    if (_program) {
-        glDeleteProgram(_program);
-        _program = 0;
-    }
-    
-	if ([EAGLContext currentContext] == _context) {
-		[EAGLContext setCurrentContext:nil];
-	}
-    
-	_context = nil;
+    dispatch_sync(_glQueue, ^{
+        _renderer = nil;
+        
+        if (_framebuffer) {
+            glDeleteFramebuffers(1, &_framebuffer);
+            _framebuffer = 0;
+        }
+        
+        if (_renderbuffer) {
+            glDeleteRenderbuffers(1, &_renderbuffer);
+            _renderbuffer = 0;
+        }
+        
+        if (_program) {
+            glDeleteProgram(_program);
+            _program = 0;
+        }
+        
+        if ([EAGLContext currentContext] == _context) {
+            [EAGLContext setCurrentContext:nil];
+        }
+        
+        _context = nil;
+    });
 }
 
 - (void)layoutSubviews {
     // The frame buffer needs to be trashed and re-created when the view size changes.
-    if (!CGSizeEqualToSize(self.bounds.size, boundsSizeAtFrameBufferEpoch) &&
-        !CGSizeEqualToSize(self.bounds.size, CGSizeZero)) {
-        [self destroyDisplayFramebuffer];
-        [self createDisplayFramebuffer];
+    CGSize boundsSize = self.bounds.size;
+    if (!CGSizeEqualToSize(boundsSize, boundsSizeAtFrameBufferEpoch) &&
+        !CGSizeEqualToSize(boundsSize, CGSizeZero)) {
+        CAEAGLLayer *eaglLayer = (CAEAGLLayer *)self.layer;
+        dispatch_async(_glQueue, ^{
+            [self destroyDisplayFramebuffer];
+            [self createDisplayFramebufferWithLayer:eaglLayer boundsSize:boundsSize];
+        });
     }
 }
 
 - (void)setContentMode:(UIViewContentMode)contentMode {
     [super setContentMode:contentMode];
-    // [self updateVertices];
-    if (_renderer.isValid)
-        [self render:nil];
 }
 
 - (void)flush {
-    [self render:nil];
-    _renderer = nil;
-    srcWidth = 0;
-    srcHeight = 0;
-    if (_textureCache) {
-        CFRelease( _textureCache );
-        _textureCache = 0;
-    }
+    dispatch_async(_glQueue, ^{
+        [self renderInternal:nil];
+        _renderer = nil;
+        srcWidth = 0;
+        srcHeight = 0;
+    });
 }
 
 - (UIImage *)curImage {
-    glBindRenderbuffer(GL_RENDERBUFFER, _renderbuffer);
+    if (srcWidth == 0 || srcHeight == 0) return nil;
     
-    NSInteger dataLength = _backingWidth * _backingHeight * 4;
-    GLubyte *data = (GLubyte *)malloc(dataLength * sizeof(GLubyte));
-    NSAssert(data != nil, @"");
-    
-    // Read pixel data from the framebuffer
-    glPixelStorei(GL_PACK_ALIGNMENT, 4);
-    glReadPixels(0, 0, _backingWidth, _backingHeight, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    
-    // Create a CGImage with the pixel data
-    // If your OpenGL ES content is opaque, use kCGImageAlphaNoneSkipLast to ignore the alpha channel
-    // otherwise, use kCGImageAlphaPremultipliedLast
-    CGDataProviderRef providerRef = CGDataProviderCreateWithData(NULL, data, dataLength, NULL);
-    CGColorSpaceRef colorspace = CGColorSpaceCreateDeviceRGB();
-    CGImageRef imageRef = CGImageCreate(_backingWidth, _backingHeight, 8, 32,
-                                        _backingWidth * 4,
-                                        colorspace, kCGBitmapByteOrder32Big | kCGImageAlphaPremultipliedLast,
-                                        providerRef, NULL, true, kCGRenderingIntentDefault);
-    
-    NSInteger widthInPoints, heightInPoints;
-//    CGFloat scale = [[UIScreen mainScreen] scale];
-    widthInPoints = srcWidth;
-    heightInPoints = srcHeight;
-    UIGraphicsBeginImageContextWithOptions(CGSizeMake(widthInPoints, heightInPoints), NO, 1);
-    
-    CGContextRef cgcontext = UIGraphicsGetCurrentContext();
-    // UIKit coordinate system is upside down to GL/Quartz coordinate system
-    // Flip the CGImage by rendering it to the flipped bitmap context
-    // The size of the destination area is measured in POINTS
-    CGContextSetBlendMode(cgcontext, kCGBlendModeCopy);
-    
-    // CPU占比高，不能不停的调用
-    CGContextDrawImage(cgcontext, CGRectMake(0.0, 0.0, widthInPoints, heightInPoints), imageRef);
-    
-    // Retrieve the UIImage from the current context
-    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
-    
-    UIGraphicsEndImageContext();
-    
-    free(data);
-    CGImageRelease(imageRef);
-    CGDataProviderRelease(providerRef);
-    CGColorSpaceRelease(colorspace);
+    __block UIImage *image = nil;
+    dispatch_sync(_glQueue, ^{
+        [EAGLContext setCurrentContext:_context];
+        glBindRenderbuffer(GL_RENDERBUFFER, _renderbuffer);
+        
+        NSInteger dataLength = _backingWidth * _backingHeight * 4;
+        GLubyte *data = (GLubyte *)malloc(dataLength * sizeof(GLubyte));
+        if (data == nil) return;
+        
+        // Read pixel data from the framebuffer
+        glPixelStorei(GL_PACK_ALIGNMENT, 4);
+        glReadPixels(0, 0, _backingWidth, _backingHeight, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        
+        // Create a CGImage with the pixel data
+        CGDataProviderRef providerRef = CGDataProviderCreateWithData(NULL, data, dataLength, NULL);
+        CGColorSpaceRef colorspace = CGColorSpaceCreateDeviceRGB();
+        CGImageRef imageRef = CGImageCreate(_backingWidth, _backingHeight, 8, 32,
+                                            _backingWidth * 4,
+                                            colorspace, kCGBitmapByteOrder32Big | kCGImageAlphaPremultipliedLast,
+                                            providerRef, NULL, true, kCGRenderingIntentDefault);
+        
+        NSInteger widthInPoints, heightInPoints;
+        widthInPoints = srcWidth;
+        heightInPoints = srcHeight;
+        UIGraphicsBeginImageContextWithOptions(CGSizeMake(widthInPoints, heightInPoints), NO, 1);
+        
+        CGContextRef cgcontext = UIGraphicsGetCurrentContext();
+        CGContextSetBlendMode(cgcontext, kCGBlendModeCopy);
+        CGContextDrawImage(cgcontext, CGRectMake(0.0, 0.0, widthInPoints, heightInPoints), imageRef);
+        
+        image = UIGraphicsGetImageFromCurrentImageContext();
+        
+        UIGraphicsEndImageContext();
+        
+        free(data);
+        CGImageRelease(imageRef);
+        CGDataProviderRelease(providerRef);
+        CGColorSpaceRelease(colorspace);
+    });
     
     return image;
 }
@@ -649,6 +659,12 @@ exit:
 }
 
 - (void)render:(KxVideoFrame *)frame {
+    dispatch_async(_glQueue, ^{
+        [self renderInternal:frame];
+    });
+}
+
+- (void)renderInternal:(KxVideoFrame *)frame {
     static const GLfloat texCoords[] = {
         0.0f, 1.0f,
         1.0f, 1.0f,
@@ -708,35 +724,6 @@ exit:
     } else {
         NSLog(@"flush");
     }
-    
-//    if (_textureCache == nil) {
-//        //  Create a new CVOpenGLESTexture cache
-//        CVReturn err = CVOpenGLESTextureCacheCreate(kCFAllocatorDefault, NULL, _context, NULL, &_textureCache);
-//        if (err) {
-//            NSLog( @"Error at CVOpenGLESTextureCacheCreate %d", err );
-//        }
-//    }
-
-//    KxVideoFrameRGB *rgbFra = (KxVideoFrameRGB *)frame;
-//    CGColorSpaceRef colorSpace;
-//    colorSpace = CGColorSpaceCreateDeviceRGB();
-//    CGDataProviderRef provider = CGDataProviderCreateWithCFData((CFDataRef)rgbFra.rgb);
-//    CGImageRef imageRef = CGImageCreate(rgbFra.width,          //width
-//                                        rgbFra.height,         //height
-//                                        8,              //bits per component
-//                                        32,             //bits per pixel
-//                                        rgbFra.width * 4,      //bytesPerRow
-//                                        colorSpace,     //colorspace
-//                                        kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little,// bitmap info
-//                                        provider,               //CGDataProviderRef
-//                                        NULL,                   //decode
-//                                        false,                  //should interpolate
-//                                        kCGRenderingIntentDefault   //intent
-//                                        );
-//    
-//    CIImage *cimage = [CIImage imageWithCGImage:imageRef];
-//    [_ciContext drawImage:cimage inRect:CGRectMake(0, 0, _backingWidth, _backingHeight) fromRect:cimage.extent];
-//    CGColorSpaceRelease(colorSpace);
     
     glBindRenderbuffer(GL_RENDERBUFFER, _renderbuffer);
     [_context presentRenderbuffer:GL_RENDERBUFFER];

@@ -18,20 +18,15 @@
     
     BOOL firstFrame;                // 得到第一帧，调整相关UI
     BOOL transforming;
-    BOOL needChangeViewFrame;
     
     // 视频帧的宽高
     int displayWidth;
     int displayHeight;
     
-    NSMutableArray *rgbFrameArray;  // 解码的视频数据
     NSMutableArray *_audioFrames;   // 解码的音频数据
     
     NSData  *_currentAudioFrame;    // 当前播放的音频帧
     NSUInteger _currentAudioFramePos;
-    
-    NSTimeInterval _tickCorrectionTime;
-    NSTimeInterval _tickCorretionPosition;
     
     CGFloat _moviePosition;         // 当前播放视频的时间戳（毫秒为单位）
 }
@@ -50,10 +45,11 @@
 
 @property (nonatomic, strong) UIView *backView;
 
-@property (nonatomic, readwrite) CGFloat bufferdDuration;
-
 @property (nonatomic, strong) UITapGestureRecognizer *tapGesture;
 @property (nonatomic, strong) UITapGestureRecognizer *doubleTapGesture;
+@property (nonatomic, assign) CFTimeInterval playStartTime;
+@property (nonatomic, assign, readwrite) BOOL hasReceivedFirstFrame;
+@property (nonatomic, assign, readwrite) NSTimeInterval firstFrameCostMs;
 
 - (void)showActivity;
 - (void)hideActivity;
@@ -75,13 +71,11 @@
         
         firstFrame = YES;
         self.videoStatus = Stopped;
-        needChangeViewFrame = NO;
         _showActiveStatus = YES;
         
         self.useHWDecoder = ![NSUserDefaultsUnit isFFMpeg];
         self.audioPlaying = YES;
         
-        rgbFrameArray = [[NSMutableArray alloc] init];
         _audioFrames = [[NSMutableArray alloc] init];
     }
     
@@ -164,11 +158,12 @@
     _kbpsLabel = [[UILabel alloc] init];
     _kbpsLabel.text = @"0kbps";
     _kbpsLabel.textColor = UIColorFromRGB(SelectBtnColor);
-    _kbpsLabel.font = [UIFont systemFontOfSize:13];
+    _kbpsLabel.font = [UIFont systemFontOfSize:12];
     [_btnView addSubview:_kbpsLabel];
     [_kbpsLabel makeConstraints:^(MASConstraintMaker *make) {
         make.top.bottom.equalTo(@0);
         make.left.equalTo(@0);
+        make.width.equalTo(@64);
     }];
     
     self.audioButton = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -181,7 +176,6 @@
     [_btnView addSubview:self.audioButton];
     [self.audioButton makeConstraints:^(MASConstraintMaker *make) {
         make.top.bottom.equalTo(@0);
-        make.left.equalTo(self.kbpsLabel.mas_right);
     }];
     
     _recordButton = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -221,14 +215,11 @@
         make.left.equalTo(self.screenshotButton.mas_right);
     }];
     
-    NSArray *views = @[ self.kbpsLabel, self.audioButton, self.recordButton, self.screenshotButton, self.landspaceButton ];
-    // 实现masonry水平固定间隔方法
-    [views mas_distributeViewsAlongAxis:MASAxisTypeHorizontal withFixedSpacing:0 leadSpacing:0 tailSpacing:0];
-    
-    // 设置array的垂直方向的约束
+    NSArray *views = @[ self.audioButton, self.recordButton, self.screenshotButton, self.landspaceButton ];
     [views mas_makeConstraints:^(MASConstraintMaker *make) {
-        
+        make.top.bottom.equalTo(@0);
     }];
+    [views mas_distributeViewsAlongAxis:MASAxisTypeHorizontal withFixedSpacing:0 leadSpacing:64 tailSpacing:0];
     
     _backView = [[UIView alloc] init];
     _backView.backgroundColor = UIColorFromRGBA(0x000000, 0.4);
@@ -306,32 +297,39 @@
                 kxGlView.frame = imageRect;
             }
         } else {
-            // 默认宽高比是16:9
-            CGFloat height = scrollView.bounds.size.height;
-            CGFloat width = scrollView.bounds.size.height * 16.0 / 9.0;
+            CGFloat fitWidth, fitHeight;
+            CGFloat boundsW = scrollView.bounds.size.width;
+            CGFloat boundsH = scrollView.bounds.size.height;
             
             if (displayHeight != 0 && displayWidth != 0) {
                 if (displayWidth > displayHeight) {
-                    width = scrollView.bounds.size.height * (float)displayWidth / (float)displayHeight;
-                    if (width < scrollView.bounds.size.width) {
-                        width = scrollView.bounds.size.width;
+                    fitWidth = boundsH * (float)displayWidth / (float)displayHeight;
+                    if (fitWidth > boundsW) {
+                        fitWidth = boundsW;
+                        fitHeight = fitWidth * (float)displayHeight / (float)displayWidth;
+                    } else {
+                        fitHeight = boundsH;
                     }
                 } else {
-                    width = height * displayWidth / displayHeight;
+                    fitWidth = boundsH * (float)displayWidth / (float)displayHeight;
+                    fitHeight = boundsH;
+                }
+            } else {
+                CGFloat ratio = 16.0 / 9.0;
+                fitWidth = boundsH * ratio;
+                if (fitWidth > boundsW) {
+                    fitWidth = boundsW;
+                    fitHeight = fitWidth / ratio;
+                } else {
+                    fitHeight = boundsH;
                 }
             }
             
-            scrollView.contentSize = CGSizeMake(width, height);
-            
-            if (width < scrollView.bounds.size.width) {
-                CGFloat x = (scrollView.bounds.size.width - width) / 2;
-                kxGlView.frame = CGRectMake(x, 0, width, height);
-            } else {
-                kxGlView.frame = CGRectMake(0, 0, width, height);
-                scrollView.contentOffset = CGPointMake((width - scrollView.bounds.size.width) / 2, 0);
-            }
-            
-            NSLog(@"displayWidth = %d displayHeight = %d %f %f frameWidht = %f frameHeight = %f", displayWidth, displayHeight, width, height, self.frame.size.width, self.frame.size.height);
+            scrollView.contentSize = scrollView.bounds.size;
+            kxGlView.frame = CGRectMake((boundsW - fitWidth) / 2,
+                                        (boundsH - fitHeight) / 2,
+                                        fitWidth,
+                                        fitHeight);
             
             [self reCalculateArcPos];
         }
@@ -364,19 +362,19 @@
     if (!self.url || self.url.length == 0) {
         return;
     }
+    _playButton.selected = YES;
     
-    _tickCorrectionTime = 0;
-    _tickCorretionPosition = 0;
     _moviePosition = 0;
     _currentAudioFramePos = 0;
-    _bufferdDuration = 0;
+    self.playStartTime = CACurrentMediaTime();
+    self.hasReceivedFirstFrame = NO;
+    self.firstFrameCostMs = 0;
     
     [self stopPlay];
     
     self.videoStatus = Connecting;
     [self showActivity];
     self.addButton.hidden = YES;
-    [self.delegate videoViewWillTryToConnect:self];
     
     __weak VideoView *weakSelf = self;
     _reader = [[PlayerDataReader alloc] initWithUrl:self.url];
@@ -393,9 +391,7 @@
     _reader.fetchMediaInfoSuccessBlock = ^(void){
         weakSelf.videoStatus = Rendering;
         [weakSelf updateUI];
-        [weakSelf presentFrame];
         
-        // 自动播放声音
         if ([NSUserDefaultsUnit isAutoAudio]) {
             [weakSelf startAudio];
         }
@@ -406,27 +402,29 @@
         [weakSelf addFrame:frame];
         [weakSelf sendPacket:length];
     };
+    _reader.rtspEventBlock = ^(NSInteger eventCode, NSString *message, NSInteger data, NSInteger count, NSInteger total) {
+        if ([weakSelf.delegate respondsToSelector:@selector(videoView:didReceiveRTSPEvent:message:data:count:total:)]) {
+            [weakSelf.delegate videoView:weakSelf didReceiveRTSPEvent:eventCode message:message data:data count:count total:total];
+        }
+    };
     [_reader start];
 }
 
 - (void)stopPlay {
-    // 关闭前，停止录像
-    _reader.recordFilePath = nil;
-    
-    [self screenShotName:YES];
+    PlayerDataReader *oldReader = _reader;
+    _reader = nil;
+
+    _playButton.selected = NO;
+    oldReader.recordFilePath = nil;
     
     [self hideActivity];
-    
     self.videoStatus = Stopped;
     
-    dispatch_queue_t queue = dispatch_queue_create("stop_all_video", NULL);
-    dispatch_async(queue, ^{
-        [self stopAudio];
-        [self.reader stop];
-    });
+    [self stopAudio];
+    [oldReader stop];
     
-    @synchronized(rgbFrameArray) {
-        [rgbFrameArray removeAllObjects];
+    if (!firstFrame && displayWidth > 0 && displayHeight > 0) {
+        [self screenShotName:YES];
     }
     
     @synchronized(_audioFrames) {
@@ -438,7 +436,6 @@
 }
 
 - (void)flush {
-    [kxGlView flush];
     firstFrame = YES;
     scrollView.zoomScale = 1.0;
     scrollView.scrollEnabled = NO;
@@ -454,14 +451,34 @@
 
 - (void)addFrame:(KxMovieFrame *)frame {
     if (frame.type == KxMovieFrameTypeVideo) {
-        @synchronized(rgbFrameArray) {
-            if (self.videoStatus != Rendering) {
-                [rgbFrameArray removeAllObjects];
-                return;
+        if (self.videoStatus != Rendering) {
+            return;
+        }
+        
+        KxVideoFrame *videoFrame = (KxVideoFrame *)frame;
+        [kxGlView render:videoFrame];
+        _moviePosition = videoFrame.position;
+        
+        BOOL needsLayout = NO;
+        if (videoFrame.width != displayWidth || displayHeight != videoFrame.height) {
+            displayWidth = (int)videoFrame.width;
+            displayHeight = (int)videoFrame.height;
+            needsLayout = YES;
+        }
+        
+        if (firstFrame) {
+            firstFrame = NO;
+            needsLayout = YES;
+            if (!self.hasReceivedFirstFrame && self.playStartTime > 0) {
+                self.hasReceivedFirstFrame = YES;
+                self.firstFrameCostMs = (CACurrentMediaTime() - self.playStartTime) * 1000.0;
             }
-            
-            [rgbFrameArray addObject:frame];
-            _bufferdDuration = frame.position - ((KxVideoFrameRGB *)rgbFrameArray.firstObject).position;
+        }
+        
+        if (needsLayout) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self updateDisplayLayout];
+            });
         }
     } else if (frame.type == KxMovieFrameTypeAudio) {
         @synchronized(_audioFrames) {
@@ -475,112 +492,13 @@
     }
 }
 
-#pragma mark - 填充视频数据
-
-- (void)presentFrame {
-    CGFloat duration = 0;
+- (void)updateDisplayLayout {
+    if (self.videoStatus != Rendering) return;
     
-    if (self.videoStatus == Rendering) {
-        NSTimeInterval time = 0.01;
-        
-        KxVideoFrame *frame = [self popVideoFrame];
-        
-        if (frame != nil) {
-            duration = [self displayFrame:frame];
-            
-            NSTimeInterval correction = [self tickCorrection];
-            
-            NSTimeInterval interval = MAX(duration + correction, 0.01);
-            
-            if (interval >= 0.035) {
-                interval = interval / 2;
-            }
-            
-            time = interval;
-        }
-        
-        dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, time * NSEC_PER_SEC);
-        dispatch_after(popTime, dispatch_get_main_queue(), ^{
-            [self presentFrame];
-        });
-    }
-}
-
-- (CGFloat)tickCorrection {
-    if (_moviePosition == 0) {
-        return 0;
-    }
-    
-    NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
-    
-    if (_tickCorrectionTime == 0) {
-        _tickCorrectionTime = now;
-        _tickCorretionPosition = _moviePosition;
-        return 0;
-    }
-    
-    NSTimeInterval dPosition = _moviePosition - _tickCorretionPosition;
-    NSTimeInterval dTime = now - _tickCorrectionTime;
-    NSTimeInterval correction = dPosition - dTime;
-    
-    if (correction > 1.f || correction < -1.f) {
-        NSLog(@"tick correction reset %0.2f", correction);
-        correction = 0;
-        
-        /* https://github.com/kolyvan/kxmovie
-         * 这句不能设置0，否则一直play faster
-         */
-//        _tickCorrectionTime = 0;
-    }
-    
-    if (_bufferdDuration >= 0.3) {
-        NSLog(@"bufferdDuration = %f play faster", _bufferdDuration);
-        correction = -1;
-    }
-    
-    return correction;
-}
-
-- (KxVideoFrame *)popVideoFrame {   // 队列
-    KxVideoFrame *frame = nil;
-    @synchronized(rgbFrameArray) {
-        if ([rgbFrameArray count] > 0) {
-            frame = [rgbFrameArray firstObject];
-            [rgbFrameArray removeObjectAtIndex:0];
-        }
-    }
-    
-    return frame;
-}
-
-- (CGFloat)displayFrame:(KxVideoFrame *)frame {
-    if (frame.width != displayWidth || displayHeight != frame.height) {
-        needChangeViewFrame = YES;
-    }
-    
-    displayWidth = (int)frame.width;
-    displayHeight = (int)frame.height;
-    
-    if ((self.videoStatus == Rendering) && firstFrame) {
-        needChangeViewFrame = YES;
-        firstFrame = NO;
-        scrollView.scrollEnabled = YES;
-        
-        // 阻止iOS设备锁屏
-        [[UIApplication sharedApplication] setIdleTimerDisabled:YES];
-        
-        [self hideActivity];
-    }
-    
-    if (needChangeViewFrame) {
-        [self setNeedsLayout];
-        needChangeViewFrame = NO;
-    }
-    
-    [kxGlView render:frame];
-    _moviePosition = frame.position;
-    
-    return frame.duration;
+    scrollView.scrollEnabled = YES;
+    [[UIApplication sharedApplication] setIdleTimerDisabled:YES];
+    [self hideActivity];
+    [self setNeedsLayout];
 }
 
 #pragma mark - 流量检测
@@ -595,7 +513,7 @@
         dispatch_source_set_timer(_timer, dispatch_walltime(NULL, 0), period * NSEC_PER_SEC, 0);
         dispatch_source_set_event_handler(_timer, ^{
             dispatch_async(dispatch_get_main_queue(), ^{
-                self.kbpsLabel.text = [NSString stringWithFormat:@"%dkbps", self.frameLength / 1024 / 1024];
+                self.kbpsLabel.text = [NSString stringWithFormat:@"%dkbps", self.frameLength * 8 / 1000];
                 self.frameLength = 0;
             });
         });
@@ -618,7 +536,7 @@
                         
                         // 似乎没有作用
                         if (differ < -0.1) {
-                            memset(outData, 0, numFrames * numChannels * sizeof(float));
+                            memset(outData, 0, numFrames * numChannels * sizeof(SInt16));
                             break; // silence and exit
                         }
                         
@@ -757,9 +675,7 @@
 }
 
 - (void) playButtonClicked:(id)sender {
-    _playButton.selected = !_playButton.selected;
-    
-    if (!_playButton.selected) {
+    if (self.videoStatus == Stopped) {
         [self startPlay];
     } else {
         [self stopPlay];
@@ -792,7 +708,16 @@
 #pragma mark - setter
 
 - (void)setVideoStatus:(IVideoStatus)videoStatus {
+    if (_videoStatus == videoStatus) {
+        return;
+    }
     _videoStatus = videoStatus;
+    
+    if ([self.delegate respondsToSelector:@selector(videoView:didChangeStatus:)]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self.delegate videoView:self didChangeStatus:videoStatus];
+        });
+    }
 }
 
 - (void)setAudioPlaying:(BOOL)audioPlaying {
@@ -839,8 +764,16 @@
     
     // 截屏
     if (_screenShotPath) {
+        UIImage *currentImage = [kxGlView curImage];
+        if (!currentImage) {
+            _screenShotPath = nil;
+            return;
+        }
         // 把图片直接保存到指定的路径（同时应该把图片的路径imagePath存起来，下次就可以直接用来取）
-        [UIImagePNGRepresentation([kxGlView curImage]) writeToFile:_screenShotPath atomically:YES];
+        NSData *imageData = UIImagePNGRepresentation(currentImage);
+        if (imageData.length > 0) {
+            [imageData writeToFile:_screenShotPath atomically:YES];
+        }
         _screenShotPath = nil;
         
         if (!isSnapshot) {

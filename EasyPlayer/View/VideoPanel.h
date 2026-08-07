@@ -47,6 +47,7 @@ typedef NS_OPTIONS(NSInteger, IVideoLayout){
 - (void) activeViewDidiUpdateStream:(VideoView *)view;
 - (void) didSelectVideoView:(VideoView *)view;
 - (void) activeVideoViewRendStatusChanged:(VideoView *)view;
+- (void) activeVideoView:(VideoView *)view didReceiveRTSPEvent:(NSInteger)eventCode message:(NSString *)message data:(NSInteger)data count:(NSInteger)count total:(NSInteger)total;
 
 - (void) videoViewWillAnimateToFullScreen:(VideoView *)view;
 - (void) videoViewWillAnimateToNomarl:(VideoView *)view;

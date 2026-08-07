@@ -10,6 +10,7 @@
 #define Muxer_h
 
 #include <stdio.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {

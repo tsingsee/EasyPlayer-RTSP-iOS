@@ -148,6 +148,7 @@ typedef struct
 	unsigned int	length;				/* 音视频帧大小 */
 	unsigned int    timestamp_usec;		/* 时间戳,微妙 */
 	unsigned int	timestamp_sec;		/* 时间戳 秒 */
+    unsigned int    pts;
 	
 	float			bitrate;			/* 比特率 */
 	float			losspacket;			/* 丢包率 */

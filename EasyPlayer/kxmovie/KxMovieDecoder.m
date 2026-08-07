@@ -51,20 +51,6 @@ NSString * kxmovieErrorDomain = @"ru.kolyvan.kxmovie";
 //    }
 //}
 
-//static NSData * copyFrameData(UInt8 *src, int linesize, int width, int height) {
-//    width = MIN(linesize, width);
-//    NSMutableData *md = [NSMutableData dataWithLength: width * height];
-//    Byte *dst = md.mutableBytes;
-//
-//    for (NSUInteger i = 0; i < height; ++i) {
-//        memcpy(dst, src, width);
-//        dst += width;
-//        src += linesize;
-//    }
-//    
-//    return md;
-//}
-
 //static BOOL isNetworkPath (NSString *path) {
 //    NSRange r = [path rangeOfString:@":"];
 //    if (r.location == NSNotFound)
@@ -159,36 +145,18 @@ NSString * kxmovieErrorDomain = @"ru.kolyvan.kxmovie";
     return KxVideoFrameFormatYUV;
 }
 
-static NSData * copyFrameData(UInt8 *src, int linesize, int width, int height)
-{
-    width = MIN(linesize, width);
-    NSMutableData *md = [NSMutableData dataWithLength: width * height];
-    Byte *dst = md.mutableBytes;
-    for (NSUInteger i = 0; i < height; ++i) {
-        memcpy(dst, src, width);
-        dst += width;
-        src += linesize;
-    }
-    return md;
-}
-
 + (instancetype) handleVideoFrame:(AVFrame *)videoFrame videoCodecCtx:(AVCodecContext *)videoCodecCtx {
     if (!videoFrame->data[0])
         return nil;
     
     KxVideoFrameYUV * frame = [[KxVideoFrameYUV alloc] init];
-    frame.luma = copyFrameData(videoFrame->data[0],
-                               videoFrame->linesize[0],
-                               videoCodecCtx->width,
-                               videoCodecCtx->height);
-    frame.chromaB = copyFrameData(videoFrame->data[1],
-                                  videoFrame->linesize[1],
-                                  videoCodecCtx->width / 2,
-                                  videoCodecCtx->height / 2);
-    frame.chromaR = copyFrameData(videoFrame->data[2],
-                                  videoFrame->linesize[2],
-                                  videoCodecCtx->width / 2,
-                                  videoCodecCtx->height / 2);
+    
+    frame.lumaData = videoFrame->data[0];
+    frame.lumaLinesize = videoFrame->linesize[0];
+    frame.chromaBData = videoFrame->data[1];
+    frame.chromaBLinesize = videoFrame->linesize[1];
+    frame.chromaRData = videoFrame->data[2];
+    frame.chromaRLinesize = videoFrame->linesize[2];
     
     return frame;
 }

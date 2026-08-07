@@ -106,6 +106,7 @@ typedef struct _DEC_DECODE_PARAM {
     int nOutHeight;
     int nLineSize;
     int need_sps_head;
+    int skip_rgb_convert;       // 跳过CPU RGB转换，减少解码耗时
     unsigned char *yuv[4];
     int linsize[4];
     

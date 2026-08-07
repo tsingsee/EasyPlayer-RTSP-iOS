@@ -5,6 +5,7 @@
 extern "C" {
 #endif
     
+#include <stdint.h>
 #include "libavformat/avformat.h"
 #include "libswresample/swresample.h"
 #include "libavcodec/avcodec.h"
@@ -17,15 +18,21 @@ extern "C" {
         AVFrame *pFrame;
         // 重采样结构体
         struct SwrContext *au_convert_ctx;
-        int out_buffer_size;
+        int out_sample_rate;
+        int out_channels;
+        int64_t out_channel_layout;
+        int in_sample_rate;
+        int in_channels;
+        int64_t in_channel_layout;
+        enum AVSampleFormat in_sample_fmt;
         uint8_t audio_buf[100 * 1024];// (uint8_t *)av_malloc(AVCODEC_MAX_AUDIO_FRAME_SIZE * 2);
     } AACDFFmpeg;
     
     // 创建aac解码器
-    void *aac_decoder_create(enum AVCodecID codecid, int sample_rate, int channels, int bit_rate);
+    void *aac_decoder_create(enum AVCodecID codecid, int sample_rate, int channels, int sample_bits);
     
     // 解码一帧音频数据
-    int aac_decode_frame(void *pParam, unsigned char *pData, int nLen, unsigned char *pPCM, unsigned int *outLen);
+    int aac_decode_frame(void *pParam, unsigned char *pData, int nLen, unsigned char *pPCM, unsigned int pcmCapacity, unsigned int *outLen);
     
     // 关闭aac解码器
     void aac_decode_close(void *pParam);
@@ -35,6 +42,5 @@ extern "C" {
 #endif
 
 #endif
-
 
 

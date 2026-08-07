@@ -22,7 +22,7 @@
     
     if (![URLUnit urlModels]) {
         URLModel *model = [[URLModel alloc] initDefault];
-        model.url = @"rtsp://";
+        model.url = @"rtsp://admin:a1234567@192.168.2.120:554/Streaming/Channels/101";
         [URLUnit addURLModel:model];
         
         [NSUserDefaultsUnit setFFMpeg:YES];     // 默认软解码
@@ -43,7 +43,7 @@
     keyboardManager.enable = YES; // 控制整个功能是否启用
     keyboardManager.shouldResignOnTouchOutside = YES; // 控制点击背景是否收起键盘
     keyboardManager.shouldToolbarUsesTextFieldTintColor = YES; // 控制键盘上的工具条文字颜色是否用户自定义
-    keyboardManager.toolbarManageBehaviour = IQAutoToolbarBySubviews; // 有多个输入框时，可以通过点击Toolbar 上的“前一个”“后一个”按钮来实现移动到不同的输入框
+//    keyboardManager.toolbarManageBehavior = IQAutoToolbarBySubviews; // 有多个输入框时，可以通过点击Toolbar 上的“前一个”“后一个”按钮来实现移动到不同的输入框
     keyboardManager.enableAutoToolbar = YES; // 控制是否显示键盘上的工具条
     keyboardManager.toolbarDoneBarButtonItemText = @"完成";
     keyboardManager.shouldShowToolbarPlaceholder = YES; // 是否显示占位文字

@@ -12,9 +12,11 @@
 @interface ScanViewController ()<AVCaptureMetadataOutputObjectsDelegate>
 
 @property (weak, nonatomic) IBOutlet UIView *contentView;
+@property (weak, nonatomic) IBOutlet UIView *scanFrameView;
 
 @property (nonatomic, strong) AVCaptureSession *captureSession;
 @property (nonatomic, strong) AVCaptureVideoPreviewLayer *videoPreviewLayer;
+@property (nonatomic, strong) AVCaptureMetadataOutput *metadataOutput;
 @property (nonatomic, strong) CALayer *scanLayer;
 
 @property (nonatomic, strong) NSTimer *timer;
@@ -32,7 +34,15 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     
+    self.contentView.backgroundColor = [UIColor clearColor];
+    self.contentView.hidden = YES;
+    
     [self loadScanView];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    [self updatePreviewLayout];
 }
 
 - (void) viewWillDisappear:(BOOL)animated {
@@ -51,35 +61,48 @@
     //2.用captureDevice创建输入流
     AVCaptureDeviceInput *input = [AVCaptureDeviceInput deviceInputWithDevice:captureDevice error:nil];
     //3.创建媒体数据输出流
-    AVCaptureMetadataOutput *output = [[AVCaptureMetadataOutput alloc] init];
+    _metadataOutput = [[AVCaptureMetadataOutput alloc] init];
     //4.实例化捕捉会话
     _captureSession = [[AVCaptureSession alloc] init];
     //4.1.将输入流添加到会话
     [_captureSession addInput:input];
     //4.2.将媒体输出流添加到会话中
-    [_captureSession addOutput:output];
+    [_captureSession addOutput:_metadataOutput];
     //5.设置代理 在主线程里刷新
-    [output setMetadataObjectsDelegate:self queue:dispatch_get_main_queue()];
+    [_metadataOutput setMetadataObjectsDelegate:self queue:dispatch_get_main_queue()];
     //5.2.设置输出媒体数据类型为QRCode
-    [output setMetadataObjectTypes:[NSArray arrayWithObject:AVMetadataObjectTypeQRCode]];
-    //6.实例化预览图层
+    [_metadataOutput setMetadataObjectTypes:@[AVMetadataObjectTypeQRCode]];
+    //6.实例化预览图层，铺满整页（勿用 16x16 的 contentView）
     _videoPreviewLayer = [[AVCaptureVideoPreviewLayer alloc] initWithSession:_captureSession];
-    //7.设置预览图层填充方式
     [_videoPreviewLayer setVideoGravity:AVLayerVideoGravityResizeAspectFill];
-    //8.设置图层的frame
-    [_videoPreviewLayer setFrame:_contentView.layer.bounds];
-    //9.将图层添加到预览view的图层上
-    [_contentView.layer addSublayer:_videoPreviewLayer];
-    //10.设置扫描范围
-    output.rectOfInterest = CGRectMake(0.2f, 0.2f, 0.8f, 0.8f);
-    //10.1.扫描框
+    [self.view.layer insertSublayer:_videoPreviewLayer atIndex:0];
     
     _scanLayer = [[CALayer alloc] init];
-    _scanLayer.frame = CGRectMake(0, 0, _contentView.bounds.size.width, 1);
+    _scanLayer.frame = CGRectMake(0, 0, 1, 1);
     _scanLayer.backgroundColor = UIColorFromRGB(SelectBtnColor).CGColor;
-    [_contentView.layer addSublayer:_scanLayer];
+    [self.scanFrameView.layer addSublayer:_scanLayer];
     
+    [self updatePreviewLayout];
     [self startRunning];
+}
+
+- (void)updatePreviewLayout {
+    if (!_videoPreviewLayer) {
+        return;
+    }
+    
+    _videoPreviewLayer.frame = self.view.layer.bounds;
+    
+    UIView *scanBox = self.scanFrameView;
+    if (scanBox.bounds.size.width > 0 && scanBox.bounds.size.height > 0) {
+        CGRect scanRectInView = [scanBox convertRect:scanBox.bounds toView:self.view];
+        if (_metadataOutput && _videoPreviewLayer) {
+            _metadataOutput.rectOfInterest = [_videoPreviewLayer metadataOutputRectOfInterestForRect:scanRectInView];
+        }
+        if (_scanLayer) {
+            _scanLayer.frame = CGRectMake(0, 0, scanBox.bounds.size.width, 1);
+        }
+    }
 }
 
 - (void)startRunning {
@@ -102,8 +125,13 @@
 }
 
 - (void)moveUpAndDownLine {
+    CGFloat scanHeight = self.scanFrameView.bounds.size.height;
+    if (scanHeight <= 0) {
+        return;
+    }
+    
     CGRect frame = self.scanLayer.frame;
-    if (_contentView.frame.size.height < self.scanLayer.frame.origin.y) {
+    if (frame.origin.y >= scanHeight - 1) {
         frame.origin.y = 0;
         self.scanLayer.frame = frame;
     } else {

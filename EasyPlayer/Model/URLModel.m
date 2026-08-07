@@ -7,7 +7,6 @@
 //
 
 #import "URLModel.h"
-#import "NSObject+YYModel.h"
 
 @implementation URLModel
 

@@ -299,6 +299,7 @@
 }
 
 - (void)videoView:(VideoView *)view response:(int)error {
+   
     if (view == _activeView) {
         [self.delegate activeVideoViewRendStatusChanged:view];
     }
@@ -313,6 +314,20 @@
 - (void)videoViewWillTryToConnect:(VideoView *)view {
     if (view == _activeView) {
         [self.delegate activeVideoViewRendStatusChanged:_activeView];
+    }
+}
+
+- (void)videoView:(VideoView *)view didChangeStatus:(IVideoStatus)status {
+    if (view == _activeView || self.layout == IVL_One) {
+        [self.delegate activeVideoViewRendStatusChanged:view];
+    }
+}
+
+- (void)videoView:(VideoView *)view didReceiveRTSPEvent:(NSInteger)eventCode message:(NSString *)message data:(NSInteger)data count:(NSInteger)count total:(NSInteger)total {
+    if (view == _activeView || self.layout == IVL_One) {
+        if ([self.delegate respondsToSelector:@selector(activeVideoView:didReceiveRTSPEvent:message:data:count:total:)]) {
+            [self.delegate activeVideoView:view didReceiveRTSPEvent:eventCode message:message data:data count:count total:total];
+        }
     }
 }
 

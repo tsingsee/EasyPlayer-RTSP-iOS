@@ -1,7 +1,7 @@
 //
-// IQUIView+IQKeyboardToolbar.h
-// https://github.com/hackiftekhar/IQKeyboardManager
-// Copyright (c) 2013-16 Iftekhar Qurashi.
+//  IQUIView+IQKeyboardToolbar.h
+//  https://github.com/hackiftekhar/IQKeyboardManager
+//  Copyright (c) 2013-24 Iftekhar Qurashi.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,16 +21,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#import "IQToolbar.h"
+#import <UIKit/UIKit.h>
 
-#import <UIKit/UIView.h>
-#import <UIKit/UIImage.h>
+#import <IQKeyboardManager/IQToolbar.h>
 
+
+NS_EXTENSION_UNAVAILABLE_IOS("Unavailable in extension")
 @interface IQBarButtonItemConfiguration : NSObject
 
--(instancetype)initWithBarButtonSystemItem:(UIBarButtonSystemItem)barButtonSystemItem action:(nullable SEL)action;
--(instancetype)initWithImage:(nonnull UIImage*)image action:(nullable SEL)action;
--(instancetype)initWithTitle:(nonnull NSString*)title action:(nullable SEL)action;
+-(nonnull instancetype)initWithBarButtonSystemItem:(UIBarButtonSystemItem)barButtonSystemItem action:(nullable SEL)action;
+-(nonnull instancetype)initWithImage:(nonnull UIImage*)image action:(nullable SEL)action;
+-(nonnull instancetype)initWithTitle:(nonnull NSString*)title action:(nullable SEL)action;
 
 @property (readonly, nonatomic) UIBarButtonSystemItem barButtonSystemItem; //System Item to be used to instantiate bar button
 @property (readonly, nonatomic, nullable) UIImage *image;    //Image to show on bar button item if it's not a system item.
@@ -39,21 +40,18 @@
 
 @end
 
+NS_EXTENSION_UNAVAILABLE_IOS("Unavailable in extension")
 @interface UIImage (IQKeyboardToolbarNextPreviousImage)
 
-+(UIImage*)keyboardPreviousiOS9Image;
-+(UIImage*)keyboardNextiOS9Image;
-+(UIImage*)keyboardPreviousiOS10Image;
-+(UIImage*)keyboardNextiOS10Image;
-
-+(UIImage*)keyboardPreviousImage;
-+(UIImage*)keyboardNextImage;
++(nullable UIImage*)keyboardPreviousImage;
++(nullable UIImage*)keyboardNextImage;
 
 @end
 
 /**
  UIView category methods to add IQToolbar on UIKeyboard.
  */
+NS_EXTENSION_UNAVAILABLE_IOS("Unavailable in extension")
 @interface UIView (IQToolbarAddition)
 
 ///-------------------------
